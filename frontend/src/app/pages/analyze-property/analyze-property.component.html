@@ -1,0 +1,342 @@
+<div class="page">
+  @if (!showResultsPage()) {
+    <div class="hero">
+      <h1>HouseIQ</h1>
+      <p>Intelligent real estate investment analysis</p>
+    </div>
+
+    <div class="underwriting-form">
+      <div class="field address-field">
+        <label>Property Address</label>
+        <input
+          type="text"
+          [ngModel]="address()"
+          (ngModelChange)="address.set($event)"
+          placeholder="Enter property address"
+        />
+      </div>
+
+      <div class="field">
+        <label>Buyer Strategy</label>
+        <select [ngModel]="profile()" (ngModelChange)="profile.set($event)">
+          <option value="house_hacker">House Hacker</option>
+          <option value="cash_flow_investor">Cash Flow Investor</option>
+          <option value="conservative">Conservative Investor</option>
+          <option value="aggressive">Aggressive Investor</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Purchase Price</label>
+        <input
+          type="number"
+          [ngModel]="purchasePrice()"
+          (ngModelChange)="purchasePrice.set($event ? +$event : null)"
+          placeholder="Auto from property"
+        />
+      </div>
+
+      <div class="field">
+        <label>Down Payment %</label>
+        <input
+          type="number"
+          [ngModel]="downPaymentPercent()"
+          (ngModelChange)="downPaymentPercent.set($event ? +$event : null)"
+          placeholder="Auto"
+        />
+      </div>
+
+      <div class="field">
+        <label>Interest Rate %</label>
+        <input
+          type="number"
+          step="0.1"
+          [ngModel]="interestRate()"
+          (ngModelChange)="interestRate.set($event ? +$event : null)"
+          placeholder="Auto"
+        />
+      </div>
+
+      <div class="form-actions">
+        <button type="button" (click)="analyzeProperty()" [disabled]="loading()">
+          {{ loading() ? 'Analyzing...' : 'Analyze Property' }}
+        </button>
+
+        <button
+          class="secondary-button clear-button"
+          type="button"
+          (click)="clearAssumptions()"
+          [disabled]="loading()"
+        >
+          Reset
+        </button>
+      </div>
+    </div>
+
+    @if (error()) {
+      <div class="error-card">
+        {{ error() }}
+      </div>
+    }
+  }
+
+  @if (showResultsPage() && summary()) {
+    <div class="results-header">
+      <button class="back-button" type="button" (click)="backToSearch()">
+        ← Edit Analysis
+      </button>
+
+      <div>
+        <span>Current Analysis</span>
+        <h2>{{ property()?.address }}</h2>
+      </div>
+    </div>
+
+    <div class="result-navigation">
+      <button [class.active]="activePage() === 'overview'" (click)="setActivePage('overview')">Overview</button>
+      <button [class.active]="activePage() === 'explanation'" (click)="setActivePage('explanation')">Deal Explanation</button>
+      <button [class.active]="activePage() === 'insights'" (click)="setActivePage('insights')">Hidden Insights</button>
+      <button [class.active]="activePage() === 'scenarios'" (click)="setActivePage('scenarios')">Scenarios</button>
+      <button [class.active]="activePage() === 'stress'" (click)="setActivePage('stress')">Stress Tests</button>
+    </div>
+
+    @if (activePage() === 'overview') {
+      <div class="results-grid">
+        <div class="card hero-result">
+          <div class="hero-top">
+            <div>
+              <h2>{{ summary()?.buy_decision }}</h2>
+              <p class="hero-description">{{ summary()?.final_summary }}</p>
+            </div>
+
+            <div class="verdict-section">
+              <span class="verdict-heading">Deal Quality</span>
+              <div class="verdict-badge dynamic-badge" [style.background]="getDealColor()">
+                {{ summary()?.recommendation }}
+              </div>
+            </div>
+          </div>
+
+          <div class="insight-grid">
+            <div class="insight-card risk-card">
+              <h4>Primary Risk</h4>
+              <p>{{ summary()?.key_blocker }}</p>
+            </div>
+
+            <div class="insight-card action-card">
+              <h4>How To Make This Deal Work</h4>
+              <ul>
+                <li>Buy below <strong>{{ formatCurrency(breakEven()?.break_even_purchase_price) }}</strong></li>
+                <li>Interest rate below <strong>{{ formatPercent(breakEven()?.max_interest_rate_for_positive_cashflow) }}</strong></li>
+                <li>Down payment above <strong>{{ formatPercent(breakEven()?.minimum_down_payment_percent) }}</strong></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="card metric-card">
+          <h3>Deal Score</h3>
+          <div class="metric" [style.color]="getScoreColor(summary()?.deal_score)">
+            {{ summary()?.deal_score ?? '--' }}
+          </div>
+        </div>
+
+        <div class="card metric-card">
+          <h3>Monthly Cash Flow</h3>
+          <div class="metric" [style.color]="getCashFlowColor(underwriting()?.monthly_cash_flow)">
+            {{ formatCurrency(underwriting()?.monthly_cash_flow) }}
+          </div>
+        </div>
+
+        <div class="card metric-card">
+          <h3>Cap Rate</h3>
+          <div class="metric" [style.color]="getMetricColor(underwriting()?.cap_rate, 8, 5)">
+            {{ formatPercent(underwriting()?.cap_rate) }}
+          </div>
+        </div>
+
+        <div class="card metric-card">
+          <h3>DSCR</h3>
+          <div class="metric" [style.color]="getMetricColor(underwriting()?.dscr, 1.25, 1)">
+            {{ underwriting()?.dscr ?? '--' }}
+          </div>
+        </div>
+
+        <div class="card metric-card">
+          <h3>Break-even Price</h3>
+          <div class="metric warning">
+            {{ formatCurrency(breakEven()?.break_even_purchase_price) }}
+          </div>
+        </div>
+
+        <div class="card metric-card">
+          <h3>Resilience</h3>
+          <div class="metric" [style.color]="getResilienceColor()">
+            {{ resilience()?.rating ?? '--' }}
+          </div>
+          <p>{{ resilience()?.interpretation }}</p>
+        </div>
+
+        <div class="card property-card">
+          <h3>Property Snapshot</h3>
+
+          <div class="property-grid">
+            <div><span>Beds</span><strong>{{ property()?.beds ?? '--' }}</strong></div>
+            <div><span>Baths</span><strong>{{ property()?.baths ?? '--' }}</strong></div>
+            <div><span>Sqft</span><strong>{{ property()?.sqft ?? '--' }}</strong></div>
+            <div><span>Year Built</span><strong>{{ property()?.year_built ?? '--' }}</strong></div>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (activePage() === 'explanation' && dealExplanation(); as explanation) {
+      <div class="single-page-card">
+        <div class="card explanation-card">
+          <div class="section-heading-row">
+            <div>
+              <span class="section-kicker">Deal Explanation</span>
+              <h3>
+                Why HouseIQ rated this deal
+                <span class="classification-text">{{ explanation.classification }}</span>
+              </h3>
+            </div>
+
+            <span class="classification-badge dynamic-badge" [style.background]="getDealColor()">
+              {{ explanation.classification }}
+            </span>
+          </div>
+
+          <p class="explanation-verdict">{{ explanation.final_verdict }}</p>
+
+          <div class="reason-grid">
+            <div class="reason-box good-box">
+              <h4>Why this deal may work</h4>
+              <ul>
+                @for (item of explanation.why_good; track item) {
+                  <li>{{ item }}</li>
+                }
+              </ul>
+            </div>
+
+            <div class="reason-box moderate-box">
+              <h4>Possible upside</h4>
+              <ul>
+                @for (item of explanation.why_moderate; track item) {
+                  <li>{{ item }}</li>
+                }
+              </ul>
+            </div>
+
+            <div class="reason-box risky-box">
+              <h4>Why this deal is risky</h4>
+              <ul>
+                @for (item of explanation.why_risky; track item) {
+                  <li>{{ item }}</li>
+                }
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (activePage() === 'insights') {
+      <div class="two-column-page">
+        <div class="card intelligence-card">
+          <span class="section-kicker">Hidden Risks Found</span>
+          <h3>What investors may miss</h3>
+          <ul class="intelligence-list">
+            @for (item of hiddenInsights(); track item) {
+              <li>{{ item }}</li>
+            }
+          </ul>
+        </div>
+
+        <div class="card intelligence-card">
+          <span class="section-kicker">Action Plan</span>
+          <h3>How to make this deal work</h3>
+          <ul class="action-list">
+            @for (item of actionPlan(); track item) {
+              <li>{{ item }}</li>
+            }
+          </ul>
+        </div>
+      </div>
+    }
+
+    @if (activePage() === 'scenarios') {
+      <div class="card property-card full-page-card">
+        <h3>Scenario Analysis</h3>
+
+        <div class="scenario-grid three-column-scenarios">
+          @if (scenarios(); as scenarioData) {
+            <div class="scenario-card base">
+              <h4>Base Case</h4>
+              <div class="scenario-metric"><span>Cash Flow</span><strong [style.color]="getCashFlowColor(scenarioData.base.cash_flow)">{{ formatCurrency(scenarioData.base.cash_flow) }}</strong></div>
+              <div class="scenario-metric"><span>Cap Rate</span><strong [style.color]="getMetricColor(scenarioData.base.cap_rate, 8, 5)">{{ formatPercent(scenarioData.base.cap_rate) }}</strong></div>
+              <div class="scenario-metric"><span>DSCR</span><strong [style.color]="getMetricColor(scenarioData.base.dscr, 1.25, 1)">{{ scenarioData.base.dscr }}</strong></div>
+              <p>{{ scenarioData.base.decision }}</p>
+            </div>
+
+            <div class="scenario-card optimistic">
+              <h4>Optimistic Case</h4>
+              <div class="scenario-metric"><span>Cash Flow</span><strong [style.color]="getCashFlowColor(scenarioData.optimistic.cash_flow)">{{ formatCurrency(scenarioData.optimistic.cash_flow) }}</strong></div>
+              <div class="scenario-metric"><span>Cap Rate</span><strong [style.color]="getMetricColor(scenarioData.optimistic.cap_rate, 8, 5)">{{ formatPercent(scenarioData.optimistic.cap_rate) }}</strong></div>
+              <div class="scenario-metric"><span>DSCR</span><strong [style.color]="getMetricColor(scenarioData.optimistic.dscr, 1.25, 1)">{{ scenarioData.optimistic.dscr }}</strong></div>
+              <p>{{ scenarioData.optimistic.decision }}</p>
+            </div>
+
+            <div class="scenario-card conservative">
+              <h4>Conservative Case</h4>
+              <div class="scenario-metric"><span>Cash Flow</span><strong [style.color]="getCashFlowColor(scenarioData.conservative.cash_flow)">{{ formatCurrency(scenarioData.conservative.cash_flow) }}</strong></div>
+              <div class="scenario-metric"><span>Cap Rate</span><strong [style.color]="getMetricColor(scenarioData.conservative.cap_rate, 8, 5)">{{ formatPercent(scenarioData.conservative.cap_rate) }}</strong></div>
+              <div class="scenario-metric"><span>DSCR</span><strong [style.color]="getMetricColor(scenarioData.conservative.dscr, 1.25, 1)">{{ scenarioData.conservative.dscr }}</strong></div>
+              <p>{{ scenarioData.conservative.decision }}</p>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (activePage() === 'stress' && resilience(); as resilienceData) {
+      <div class="card property-card full-page-card">
+        <h3>Stress Tests</h3>
+
+        <div class="stress-grid">
+          <div class="stress-card">
+            <span>Income -5%</span>
+            <strong [style.color]="getCashFlowColor(resilienceData.stress_tests.income_reduction_5_percent.cash_flow)">
+              {{ formatCurrency(resilienceData.stress_tests.income_reduction_5_percent.cash_flow) }}
+            </strong>
+            <p>{{ resilienceData.stress_tests.income_reduction_5_percent.decision }}</p>
+          </div>
+
+          <div class="stress-card">
+            <span>Income -10%</span>
+            <strong [style.color]="getCashFlowColor(resilienceData.stress_tests.income_reduction_10_percent.cash_flow)">
+              {{ formatCurrency(resilienceData.stress_tests.income_reduction_10_percent.cash_flow) }}
+            </strong>
+            <p>{{ resilienceData.stress_tests.income_reduction_10_percent.decision }}</p>
+          </div>
+
+          <div class="stress-card">
+            <span>Interest +1%</span>
+            <strong [style.color]="getCashFlowColor(resilienceData.stress_tests.interest_rate_plus_1_percent.cash_flow)">
+              {{ formatCurrency(resilienceData.stress_tests.interest_rate_plus_1_percent.cash_flow) }}
+            </strong>
+            <p>{{ resilienceData.stress_tests.interest_rate_plus_1_percent.decision }}</p>
+          </div>
+
+          <div class="stress-card">
+            <span>Maintenance Doubles</span>
+            <strong [style.color]="getCashFlowColor(resilienceData.stress_tests.maintenance_double.cash_flow)">
+              {{ formatCurrency(resilienceData.stress_tests.maintenance_double.cash_flow) }}
+            </strong>
+            <p>{{ resilienceData.stress_tests.maintenance_double.decision }}</p>
+          </div>
+        </div>
+      </div>
+    }
+  }
+</div>
