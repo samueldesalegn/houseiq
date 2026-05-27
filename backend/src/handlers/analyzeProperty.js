@@ -23,19 +23,30 @@ const TABLE_NAME = process.env.TABLE_NAME;
 
 const ALLOWED_ORIGINS = new Set([
     "http://localhost:4200",
+
+    // S3 website
     "http://houseiq-frontend-samuel.s3-website-us-east-1.amazonaws.com",
+
+    // Current CloudFront distribution
+    "https://d3drvfi3t99s.cloudfront.net",
+
+    // SD Cloud Hub
     "https://sdcloudhub.com",
     "https://www.sdcloudhub.com",
+
+    // Future HouseIQ custom domain
     "https://houseiq.sdcloudhub.com",
 ]);
-
 function getAllowedOrigin(event) {
     const origin =
         event?.headers?.origin ||
         event?.headers?.Origin ||
-        "http://localhost:4200";
+        "";
 
-    if (ALLOWED_ORIGINS.has(origin)) {
+    if (
+        ALLOWED_ORIGINS.has(origin) ||
+        origin.endsWith(".cloudfront.net")
+    ) {
         return origin;
     }
 
